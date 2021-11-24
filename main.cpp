@@ -18,24 +18,31 @@
 #define START_POS_Y		22
 
 #define HUDDLE_START_X	104
-#define ROCK_START_Y	30
+#define ROCK_START_Y	29
 #define TREE_START_Y	25
 #define BIRD_Y0			6
 #define BIRD_Y1			11
 #define BIRD_Y2			16
 #define CLOUD_START_Y	9
+#define BULLET_START_X	START_POS_X + 18
 
 #define ITEM_START_X	106
 #define ITEM_UPDATE		15
-#define SPEED_UPDATE	20
+#define SPEED_UPDATE	35
 #define STAR_MAINTAIN	10
+#define MONSTER_UPDATE	30
+
+// modify
+#define SKY_START_X		106
+#define MONSTER_START_X	95
+#define MONSTER_START_Y 3
 
 using namespace std;
 typedef unsigned int uint;
 
 /*----------자료형 영역----------*/
 enum {
-	BLACK, DARK_BLUE, DARK_GREEN, DARK_SKYBLUE, DARK_RED, DARK_VOILET, DAKR_YELLOW,
+	BLACK, DARK_BLUE, DARK_GREEN, DARK_SKYBLUE, DARK_RED, DARK_VOILET, DARK_YELLOW,
 	GRAY, DARK_GRAY, BLUE, GREEN, SKYBLUE, RED, VIOLET, YELLOW, WHITE,
 };
 
@@ -46,7 +53,7 @@ typedef struct _position {
 
 class Huddle {
 private:
-	uint type; // rock, tree, bird, cloud
+	uint type; // rock, tree, bird
 	P pos;
 public:
 	Huddle() : type(0) { pos.x = HUDDLE_START_X; pos.y = 0; }
@@ -58,7 +65,7 @@ public:
 	void set_Xpos(int val) { pos.x = val; }
 	void set_Ypos(int val) { pos.y = val; }
 	void reset() {
-		//type = t;
+		// type = t;
 		pos.x = HUDDLE_START_X;
 		pos.y = 0;
 	}
@@ -80,6 +87,7 @@ public:
 	void set_Xpos(int val) { pos.x = val; }
 	void set_Ypos(int val) { pos.y = val; }
 	friend void Character();
+	friend class Bullet;
 	void reset() {
 		// score = 0;
 		hp = MAX_HP;
@@ -102,32 +110,62 @@ public:
 	void set_Xpos(int val) { pos.x = val; }
 	void set_Ypos(int val) { pos.y = val; }
 	void reset() {
-		//type = t;
+		type = 2;
 		pos.x = ITEM_START_X;
 		pos.y = 13;
 	}
 };
 
-/*
-class Cloud {
+// modify
+class Sky {
 private:
+	uint type;	// cloud, bird
 	P pos;
 public:
-	Cloud() : { pos.x = CLOUD_START_X; pos.y = 0; }
+	Sky() : type(0) { pos.x = SKY_START_X; pos.y = 0; }
 	int get_Xpos() { return pos.x; }
 	int get_Ypos() { return pos.y; }
 	void set_Xpos(int val) { pos.x = val; }
 	void set_Ypos(int val) { pos.y = val; }
 	void reset() {
-		pos.x = CLOUD_START_X;
+		// type = t;
+		pos.x = SKY_START_X;
 		pos.y = 0;
 	}
 };
-*/
 
-class bullet {
+class Monster {
+private:
+	bool isDead;
+	P pos;
+public:
+	Monster() : isDead(FALSE) { pos.x = MONSTER_START_X; pos.y = MONSTER_START_Y; }
+	bool get_dead() { return isDead; }
+	int get_Xpos() { return pos.x; }
+	int get_Ypos() { return pos.y; }
+	void set_dead(bool val) { isDead = val; }
+	void set_Xpos(int val) { pos.x = val; }
+	void set_Ypos(int val) { pos.y = val; }
+	void reset() {
+		isDead = FALSE;
+		pos.x = MONSTER_START_X;
+		pos.y = MONSTER_START_Y;
+	}
+};
+
+class Bullet {
 private:
 	P pos;
+public:
+	Bullet() { pos.x = BULLET_START_X; pos.y = 0; }
+	int get_Xpos() { return pos.x; }
+	int get_Ypos() { return pos.y; }
+	void set_Xpos(int val) { pos.x = val; }
+	void set_Ypos(int val) { pos.y = val; }
+	void reset() {
+		pos.x = BULLET_START_X;
+		pos.y = 0;
+	}
 };
 
 class map {
@@ -135,11 +173,14 @@ private:
 	uint time;
 };
 
+/*---------전역 변수 초기화---------*/
 int playerNum;
 Player playerInfo[3];
 Huddle huddleInfo[3];
 Item itemInfo[3];
-// Cloud cloudInfo[1];
+Sky skyInfo[3];
+Monster monsterInfo;
+Bullet bulletInfo;
 
 /*----------함수 영역 시작----------*/
 void init_class()
@@ -148,8 +189,10 @@ void init_class()
 		playerInfo[i].reset();
 		huddleInfo[i].reset();
 		itemInfo[i].reset();
+		skyInfo[i].reset();
 	}
-	// cloudInfo[0].reset();
+	monsterInfo.reset();
+	bulletInfo.reset();
 }
 
 void get_scores_file()
@@ -189,13 +232,6 @@ void cursor_pos(int x, int y)
 	p.X = x;
 	p.Y = y;
 	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), p);
-}
-
-int input_key()
-{
-	if (_kbhit())
-		return _getch();
-	return 0;
 }
 
 int input_key_dir()
@@ -287,7 +323,7 @@ int MainMenu()
 	return menu;
 }
 
-void GameStart()
+int GameStart()
 {
 	int x = 44, y = 10;
 	system("cls");
@@ -303,13 +339,14 @@ void GameStart()
 	printf("=================================");
 	printf("\n\n\n\n\n\n\n\n\n\n\n");
 
-	bool isSelect = FALSE;
+	int select = 4;
 
 	while (1) {
 		int key = input_key_dir();
 		if (key == DOWN) playerNum++;
 		else if (key == UP) playerNum += 2;
-		else if (key == RIGHT) isSelect = TRUE;
+		else if (key == RIGHT) select = playerNum;
+		else if (key == LEFT) select = 3;
 		else if (key == 0) continue;
 
 		playerNum %= 3;
@@ -355,8 +392,9 @@ void GameStart()
 		}
 		printf("\n\n\n\n\n\n\n\n\n\n\n");
 
-		if (isSelect) break;
+		if (select < 4) break;
 	}
+	return select;
 }
 
 void Count3sec()
@@ -447,7 +485,7 @@ void Score()
 {
 	string name[] = { "Player1", "Player2", "Player3" };
 	int ranking[] = { 0, 1, 2 };
-	int x = 45, y = 10;
+	int x = 44, y = 10;
 
 	//sort(); ranking을 sort
 
@@ -471,7 +509,7 @@ void Score()
 	}
 }
 
-void Character(Player myplay)
+void Character(Player myplay, int isStar)
 {
 	int x = myplay.get_Xpos(), y = myplay.get_Ypos();
 	//system("cls");
@@ -480,72 +518,117 @@ void Character(Player myplay)
 	printf("■■■");
 	cursor_pos(x + 4, y++);
 	printf("■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
 	cursor_pos(x + 2, y++);
 	printf("■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
 	cursor_pos(x + 2, y++);
 	printf("■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■■");
 	cursor_pos(x, y++);
 	printf("■■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_SKYBLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_SKYBLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), SKYBLUE);
 	printf("■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
 	cursor_pos(x, y++);
 	printf("■■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■■");
 	cursor_pos(x, y++);
 	printf("■■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
 	cursor_pos(x, y++);
 	printf("■■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
 	cursor_pos(x + 2, y++);
 	printf("■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
 	cursor_pos(x + 2, y++);
 	printf("■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■  ■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	if (!isStar)
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	else
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), YELLOW);
 	printf("■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	printf("■");
 	cursor_pos(x + 3, y++);
 	printf("■■    ■■");
+	//system("pause");
+}
+
+void Dot(int posX) {
+	int x = posX, y = bulletInfo.get_Ypos();
+	//system("cls");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_RED);
+	cursor_pos(x, y);
+	printf("■▶");
 	//system("pause");
 }
 
@@ -580,7 +663,7 @@ void Tree(int posX)
 	printf("■■■■■");
 	cursor_pos(x, y++);
 	printf("■■■■■");
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DAKR_YELLOW);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_YELLOW);
 	cursor_pos(x + 3, y++);
 	printf("■■");
 	cursor_pos(x + 3, y++);
@@ -606,9 +689,9 @@ void Bird(int posX, int posY)
 	//system("pause");
 }
 
-void Cloud(int posX)
+void Cloud(int posX, int posY)
 {
-	int x = posX, y = CLOUD_START_Y;
+	int x = posX, y = posY;
 	//system("cls");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), SKYBLUE);
 	cursor_pos(x + 2, y++);
@@ -621,6 +704,83 @@ void Cloud(int posX)
 	printf("■■■■■■■");
 	cursor_pos(x + 2, y++);
 	printf("■■■■");
+	//system("pause");
+}
+
+void Ghost(int posX, int posY)
+{
+	int x = posX, y = posY;
+	//system("cls");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	cursor_pos(x + 8, y++);
+	printf("■■■■");
+	cursor_pos(x + 4, y++);
+	printf("■■■■■■■■");
+	cursor_pos(x + 2, y++);
+	printf("■■■■■■■■■■");
+	cursor_pos(x, y++);
+	printf("■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■■");
+	cursor_pos(x, y++);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■");
+	cursor_pos(x, y++);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■");
+	cursor_pos(x, y++);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_BLUE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■");
+	cursor_pos(x, y++);
+	printf("■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
+	printf("■■");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), VIOLET);
+	printf("■■■");
+	cursor_pos(x, y++);
+	printf("■■■■■■■■■■■■");
+	cursor_pos(x, y++);
+	printf("■■■■■■■■■■■■");
+	cursor_pos(x, y++);
+	printf("■■■  ■■■■  ■■■");
+	cursor_pos(x, y++);
+	printf("■■      ■■      ■■");
 	//system("pause");
 }
 
@@ -690,7 +850,8 @@ void GameOver()
 	printf("■    ■       ■■       ■          ■   ■");
 	cursor_pos(x, y++);
 	printf("■■■■        ■        ■■■■    ■    ■");
-	printf("\n\n\n\n\n\n\n\n\n\n\n");
+	//printf("\n\n\n\n\n\n\n\n\n\n\n");
+	cursor_pos(x + 5, y + 5);
 	system("pause");
 }
 
@@ -705,14 +866,46 @@ void ShowScore(uint score)
 		printf("♥ ");
 }
 
+int check_attack()
+{
+	int mx = monsterInfo.get_Xpos(), my = monsterInfo.get_Ypos();
+	int bx = bulletInfo.get_Xpos(), by = bulletInfo.get_Ypos();
+	for (int i = bx; i < bx + 2; i++) {
+		for (int nx = mx; nx < mx + 12; nx++) {
+			for (int ny = my; ny < my + 12; ny++) {
+				if (i == nx && by == ny) return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+int check_hunt(bool status)
+{
+	if (status) return 0;
+
+	int mx = monsterInfo.get_Xpos(), my = monsterInfo.get_Ypos();
+	int px = playerInfo[playerNum].get_Xpos(), py = playerInfo[playerNum].get_Ypos();
+	for (int i = px; i < px + 8; i++) {
+		for (int j = py; j < py + 11; j++) {
+			for (int nx = mx; nx < mx + 12; nx++) {
+				for (int ny = my; ny < my + 12; ny++) {
+					if (i == nx && j == ny) return 1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
 int check_fail(uint player, uint huddle, bool status)
 {
-	if (status == TRUE) return 0;
+	if (status) return 0;
 
 	if (huddle == 0) {
 		// rock
 		int x = huddleInfo[huddle].get_Xpos(), y = ROCK_START_Y;
-		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 9; i++) {
+		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 8; i++) {
 			for (int j = playerInfo[player].get_Ypos(); j < playerInfo[player].get_Ypos() + 11; j++) {
 				for (int nx = x; nx < x + 4; nx++) {
 					for (int ny = y; ny < y + 4; ny++) {
@@ -725,7 +918,7 @@ int check_fail(uint player, uint huddle, bool status)
 	else if (huddle == 1) {
 		// tree
 		int x = huddleInfo[huddle].get_Xpos(), y = TREE_START_Y;
-		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 9; i++) {
+		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 8; i++) {
 			for (int j = playerInfo[player].get_Ypos(); j < playerInfo[player].get_Ypos() + 11; j++) {
 				for (int nx = x; nx < x + 5; nx++) {
 					for (int ny = y; ny < y + 8; ny++) {
@@ -739,7 +932,7 @@ int check_fail(uint player, uint huddle, bool status)
 	else if (huddle == 2) {
 		// bird
 		int x = huddleInfo[huddle].get_Xpos(), y = huddleInfo[huddle].get_Ypos();
-		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 9; i++) {
+		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 8; i++) {
 			for (int j = playerInfo[player].get_Ypos(); j < playerInfo[player].get_Ypos() + 11; j++) {
 				for (int nx = x; nx < x + 12; nx++) {
 					for (int ny = y; ny < y + 4; ny++) {
@@ -757,7 +950,7 @@ int check_success(uint player, uint item)
 	if (item == 0) {
 		// heart
 		int x = itemInfo[item].get_Xpos(), y = itemInfo[item].get_Ypos();
-		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 9; i++) {
+		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 8; i++) {
 			for (int j = playerInfo[player].get_Ypos(); j < playerInfo[player].get_Ypos() + 11; j++) {
 				for (int nx = x; nx < x + 7; nx++) {
 					for (int ny = y; ny < y + 5; ny++) {
@@ -770,7 +963,7 @@ int check_success(uint player, uint item)
 	else if (item == 1) {
 		// star
 		int x = itemInfo[item].get_Xpos(), y = itemInfo[item].get_Ypos();
-		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 9; i++) {
+		for (int i = playerInfo[player].get_Xpos(); i < playerInfo[player].get_Xpos() + 8; i++) {
 			for (int j = playerInfo[player].get_Ypos(); j < playerInfo[player].get_Ypos() + 11; j++) {
 				for (int nx = x; nx < x + 5; nx++) {
 					for (int ny = y; ny < y + 5; ny++) {
@@ -783,7 +976,7 @@ int check_success(uint player, uint item)
 	return 0;
 }
 
-int Playing()
+void Playing()
 {
 	// 시간 관련 변수
 	time_t start = time(NULL), middle, finish;
@@ -792,7 +985,7 @@ int Playing()
 	time(&start_star);
 
 	// 점프 관련 변수
-	char jump_type = 0; // no jump state
+	char jump_type = 0; //no jump state
 	int jump_size = 8, jump_cnt = 0;
 	bool down = false;
 
@@ -808,8 +1001,23 @@ int Playing()
 	bool item_check = TRUE;
 	int item_once = 0;
 
+	/*
+	// 하늘 관련 변수
+	int sky_type = 0;
+	int sky_speed = 2;
+	bool sky_check = TRUE;
+	*/
+
+	// 몬스터 관련 변수
+	int monster_type = 0;
+	int monster_speed = 2;
+	int monster_direction = 1;
+	int monster_once = 0;
+
+	// 총알 관련 변수
+	bool bullet_check = FALSE;
+
 	while (1) {
-		system("cls");
 
 		// 10초마다 장애물 속도 증가
 		middle = time(NULL);
@@ -817,8 +1025,9 @@ int Playing()
 		if (((int)difftime(middle, start)) > (huddle_speed - 1) * SPEED_UPDATE) huddle_speed++;
 
 		// 2단 점프
-		int key = input_key_dir();
-		if (key == UP) {
+		int key_dir = input_key_dir();
+
+		if (key_dir == UP) {
 			if (jump_type == 0)
 				jump_type = 1;
 			else if (jump_type == 1) {
@@ -838,7 +1047,7 @@ int Playing()
 
 			if (jump_cnt == jump_size) {
 				if (!down) {
-					Character(playerInfo[playerNum]);
+					//Character(playerInfo[playerNum]);
 					down = true;
 					jump_cnt = 0;
 				}
@@ -851,13 +1060,41 @@ int Playing()
 			}
 		}
 
+		// 총알 위치 선정
+		if (key_dir == RIGHT && !bullet_check) {
+			bulletInfo.set_Xpos(BULLET_START_X);
+			bulletInfo.set_Ypos(playerInfo[playerNum].get_Ypos() + 4);
+			bullet_check = TRUE;
+		}
+		if (bullet_check) {
+			uint bullet_curx = bulletInfo.get_Xpos();
+			bulletInfo.set_Xpos(bullet_curx + 2);
+			if ((int)difftime(middle, start) > MONSTER_UPDATE && (!monsterInfo.get_dead() && check_attack())) {
+				bullet_check = FALSE;
+				monsterInfo.set_dead(TRUE);
+			}
+		}
+		if (bulletInfo.get_Xpos() > 116) {
+			bullet_check = FALSE;
+		}
+
+		/*
+		// 구름 위치 선정
+		uint cloud_curx = skyInfo[sky_type].get_Xpos();
+		skyInfo[sky_type].set_Xpos(cloud_curx - sky_speed);
+
+		// 구름 타입 교체
+		if (skyInfo[sky_type].get_Xpos() < 0) {
+
+		}
+		*/
+
 		// 장애물 위치 선정
 		uint huddle_curx = huddleInfo[huddle_type].get_Xpos();
 		huddleInfo[huddle_type].set_Xpos(huddle_curx - huddle_speed);
 
 		// 장애물 타입 교체
-		if (huddleInfo[huddle_type].get_Xpos() < 0)
-		{
+		if (huddleInfo[huddle_type].get_Xpos() < 0) {
 			huddle_type = randomNum(0, 2);
 			huddle_check = TRUE;
 			huddleInfo[huddle_type].set_Xpos(HUDDLE_START_X);
@@ -876,27 +1113,49 @@ int Playing()
 			}
 		}
 
-		// 아이템 위치 선정
-		uint item_curx = itemInfo[item_type].get_Xpos();
-		itemInfo[item_type].set_Xpos(item_curx - item_speed);
+		// 몬스터 위치 선정
+		if ((int)difftime(middle, start) > MONSTER_UPDATE) {
+			int monster_curx = monsterInfo.get_Xpos();
+			int monster_cury = monsterInfo.get_Ypos();
+			monsterInfo.set_Xpos(monster_curx - monster_speed);
 
-		// 아이템 타입 교체
-		if (((int)difftime(middle, start)) % ITEM_UPDATE == 0) item_once++;
-		if (itemInfo[item_type].get_Xpos() < 0 && item_once == 1) {
-			item_type = randomNum(0, 1);
-			start_star = time(NULL);
-			time(&start_star);
-			item_check = TRUE;
-			itemInfo[item_type].set_Xpos(ITEM_START_X);
-			itemInfo[item_type].set_Ypos(randomNum(8, 25));
+			if (monster_cury <= 3)
+				monster_direction = 1;
+			else if (monster_cury >= 18)
+				monster_direction = -1;
+			monsterInfo.set_Ypos(monster_cury + monster_direction);
+
+			if (((int)difftime(middle, start)) % MONSTER_UPDATE == 0) monster_once++;
+			if (monsterInfo.get_Xpos() < 0 && monster_once == 1) {
+				monsterInfo.set_Xpos(MONSTER_START_X);
+				monsterInfo.set_Ypos(randomNum(2, 18));
+				monsterInfo.set_dead(FALSE);
+			}
+			if (((int)difftime(middle, start)) % (MONSTER_UPDATE + 1) == 0) monster_once = 0;
 		}
-		if (((int)difftime(middle, start)) % (ITEM_UPDATE + 1) == 0) item_once = 0;
 
-		// 게임 오버 판정
-		if (check_fail(playerNum, huddle_type, isStar) && huddle_check) {
-			huddle_check = FALSE;
-			playerInfo[playerNum].set_hp(playerInfo[playerNum].get_hp() - 1);
-			if (playerInfo[playerNum].get_hp() == 0) break;
+		if ((int)difftime(middle, start) > MONSTER_UPDATE && (!monsterInfo.get_dead() && check_hunt(isStar))) {
+			break;
+		}
+
+		// 아이템 위치 선정
+		if ((int)difftime(middle, start) > ITEM_UPDATE) {
+			int item_curx = itemInfo[item_type].get_Xpos();
+			itemInfo[item_type].set_Xpos(item_curx - item_speed);
+
+			// 아이템 타입 교체
+			if (((int)difftime(middle, start)) % ITEM_UPDATE == 0) item_once++;
+			if (itemInfo[item_type].get_Xpos() < 0 && item_once == 1) {
+				item_type = randomNum(0, 1);
+				item_check = TRUE;
+				itemInfo[item_type].set_Xpos(ITEM_START_X);
+				itemInfo[item_type].set_Ypos(randomNum(8, 25));
+				if (item_type == 1) {
+					start_star = time(NULL);
+					time(&start_star);
+				}
+			}
+			if (((int)difftime(middle, start)) % (ITEM_UPDATE + 1) == 0) item_once = 0;
 		}
 
 		// 아이템 얻었는지 판정
@@ -909,29 +1168,48 @@ int Playing()
 			item_type = 2;
 		}
 
+		// 무적 상태 10초 유지
 		if (((int)difftime(middle, start_star)) > (item_speed - 1) * STAR_MAINTAIN)
 			isStar = FALSE;
 
+		// 게임 오버 판정
+		if (check_fail(playerNum, huddle_type, isStar) && huddle_check) {
+			huddle_check = FALSE;
+			playerInfo[playerNum].set_hp(playerInfo[playerNum].get_hp() - 1);
+			if (playerInfo[playerNum].get_hp() == 0) break;
+		}
+
 		// 화면 출력
+		system("cls");
+
 		// 현재 점수, HP
 		ShowScore((int)difftime(middle, start));
 
-		//현재 무적인지 아닌지 --->>> 배경색바꾸기////////////////
-		cursor_pos(2, 2);
-		printf("STAR = %d", isStar);
-
 		// 캐릭터 그리기
-		Character(playerInfo[playerNum]);
+		Character(playerInfo[playerNum], isStar);
 
 		// 아이템 그리기
-		if (itemInfo[item_type].get_Xpos() > 0) {
-			switch (item_type) {
-			case 0:
-				Heart(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos()); break;
-			case 1:
-				Star(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos()); break;
+		if ((int)difftime(middle, start) > ITEM_UPDATE) {
+			if (itemInfo[item_type].get_Xpos() > 0) {
+				switch (item_type) {
+				case 0:
+					Heart(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos()); break;
+				case 1:
+					Star(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos()); break;
+				}
 			}
 		}
+
+		// 몬스터 그리기
+		if (((int)difftime(middle, start) > MONSTER_UPDATE) && (!monsterInfo.get_dead())) {
+			if (monsterInfo.get_Xpos() > 0) {
+				Ghost(monsterInfo.get_Xpos(), monsterInfo.get_Ypos());
+			}
+		}
+
+		// 총알 그리기
+		if (bullet_check)
+			Dot(bulletInfo.get_Xpos());
 
 		// 장애물 그리기
 		switch (huddle_type) {
@@ -942,9 +1220,6 @@ int Playing()
 		case 2:
 			Bird(huddleInfo[huddle_type].get_Xpos(), huddleInfo[huddle_type].get_Ypos()); break;
 		}
-
-		// 구름 그리기
-		// Cloud(cloudInfo[1].get_Xpos()); break;
 	}
 
 	// 점수 설정
@@ -955,23 +1230,31 @@ int Playing()
 
 	playerInfo[playerNum].set_score(flowTime > prev ? flowTime : prev);
 
-	return playerInfo[playerNum].get_score();
+	return;
 }
 
 int main()
 {
-	system("mode con:cols=120 lines=35"); //가로, 세로
-	//SetConsoleTitle("Team10  Google Dinosaurs Game Plus Version");
+	system("mode con:cols=120 lines=35"); // 가로, 세로
 	get_scores_file();
 
 	while (1)
 	{
-		int gameScore = 0;
 		playerNum = 0;
 		init_class();
+		int next_GameStart = 4, next_Score = 4;
 
 		switch (MainMenu()) {
-		case 0: GameStart(); /*Count3sec();*/ gameScore = Playing(); GameOver(); break;
+		case 0: {
+			next_GameStart = GameStart();		// player 선택
+			if (next_GameStart == 3) break;		// 첫 화면으로 이동
+			else if (next_GameStart < 4) {
+				// Count3sec();					// 게임 시작 전 3초 count
+				Playing();
+				GameOver();
+				break;
+			}
+		}
 		case 1: Score(); break;
 		case 2: system("cls"); set_scores_file(); return 0;
 		}
