@@ -13,20 +13,19 @@
 #define LEFT			75
 #define RIGHT			77
 
-#define START_POS_X		4
+#define MAX_HP			3
+#define START_POS_X		5
 #define START_POS_Y		22
 
-#define HUDDLE_START_X	100
+#define HUDDLE_START_X	104
 #define ROCK_START_Y	30
 #define TREE_START_Y	25
-#define BIRD_Y0			7
-#define BIRD_Y1			10
-#define BIRD_Y2			13
+#define BIRD_Y0			6
+#define BIRD_Y1			11
+#define BIRD_Y2			16
+#define CLOUD_START_Y	9
 
-#define MAX_HP			3
-
-#define ITEM_START_X	100
-
+#define ITEM_START_X	106
 #define ITEM_UPDATE		15
 #define SPEED_UPDATE	20
 #define STAR_MAINTAIN	10
@@ -58,8 +57,8 @@ public:
 	void set_type(uint t) { type = t; }
 	void set_Xpos(int val) { pos.x = val; }
 	void set_Ypos(int val) { pos.y = val; }
-	void reset(int t) {
-		type = t;
+	void reset() {
+		//type = t;
 		pos.x = HUDDLE_START_X;
 		pos.y = 0;
 	}
@@ -95,15 +94,15 @@ private:
 	P pos;
 public:
 	Item() : type(0) { pos.x = ITEM_START_X; pos.y = 0; }
-	Item(uint t) : type(t) { pos.x = ITEM_START_X; pos.y = 0; }
+	//Item(uint t) : type(t) { pos.x = ITEM_START_X; pos.y = 0; }
 	uint get_type() { return type; }
 	int get_Xpos() { return pos.x; }
 	int get_Ypos() { return pos.y; }
 	void set_type(uint t) { type = t; }
 	void set_Xpos(int val) { pos.x = val; }
 	void set_Ypos(int val) { pos.y = val; }
-	void reset(int t) {
-		type = t;
+	void reset() {
+		//type = t;
 		pos.x = ITEM_START_X;
 		pos.y = 13;
 	}
@@ -147,8 +146,8 @@ void init_class()
 {
 	for (int i = 0; i < 3; i++) {
 		playerInfo[i].reset();
-		huddleInfo[i].reset(i);
-		itemInfo[i].reset(i);
+		huddleInfo[i].reset();
+		itemInfo[i].reset();
 	}
 	// cloudInfo[0].reset();
 }
@@ -172,6 +171,16 @@ void set_scores_file()
 		out << playerInfo[i].get_score() << " ";
 	out.close();
 	return;
+}
+
+template <typename T>
+inline T randomNum(T min, T max)
+{
+	random_device rd;
+	mt19937 gen(rd());
+	uniform_int_distribution<T> dist(min, max);
+
+	return dist(gen);
 }
 
 void cursor_pos(int x, int y)
@@ -572,11 +581,11 @@ void Tree(int posX)
 	cursor_pos(x, y++);
 	printf("■■■■■");
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DAKR_YELLOW);
-	cursor_pos(x + 2, y++);
+	cursor_pos(x + 3, y++);
 	printf("■■");
-	cursor_pos(x + 2, y++);
+	cursor_pos(x + 3, y++);
 	printf("■■");
-	cursor_pos(x + 2, y++);
+	cursor_pos(x + 3, y++);
 	printf("■■");
 	//system("pause");
 }
@@ -594,6 +603,24 @@ void Bird(int posX, int posY)
 	printf("■■");
 	cursor_pos(x + 6, y++);
 	printf("■■");
+	//system("pause");
+}
+
+void Cloud(int posX)
+{
+	int x = posX, y = CLOUD_START_Y;
+	//system("cls");
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), SKYBLUE);
+	cursor_pos(x + 2, y++);
+	printf("■■  ■■");
+	cursor_pos(x, y++);
+	printf("■■■■■■■");
+	cursor_pos(x, y++);
+	printf("■■■■■■■■");
+	cursor_pos(x, y++);
+	printf("■■■■■■■");
+	cursor_pos(x + 2, y++);
+	printf("■■■■");
 	//system("pause");
 }
 
@@ -670,8 +697,12 @@ void GameOver()
 void ShowScore(uint score)
 {
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
-	cursor_pos(0, 0);
-	printf("SCORE = %u", score);
+	cursor_pos(2, 1);
+	printf("SCORE  %u", score);
+	cursor_pos(102, 1);
+	printf("HEART  ");
+	for (int i = 0; i < playerInfo[playerNum].get_hp(); i++)
+		printf("♥ ");
 }
 
 int check_fail(uint player, uint huddle, bool status)
@@ -761,26 +792,14 @@ int Playing()
 	time(&start_star);
 
 	// 점프 관련 변수
-	char jump_type = 0; //no jump state
+	char jump_type = 0; // no jump state
 	int jump_size = 8, jump_cnt = 0;
 	bool down = false;
-
-	// 장애물 종류 선정을 위한 난수 생성
-	random_device rd;
-	mt19937 gen(rd());
-	uniform_int_distribution<int> dis1(0, 2);
-
-	// 아이템 종류 선정을 위한 난수 생성
-	uniform_int_distribution<int> dis2(0, 1);
-
-	// 아이템 높이 선정을 위한 난수 생성
-	uniform_int_distribution<int> dis3(11, 25);
 
 	// 장애물 관련 변수
 	int huddle_speed = 2;
 	int huddle_type = 0;
 	bool huddle_check = TRUE;
-	int bird_height = 0;
 
 	// 아이템 관련 변수
 	bool isStar = FALSE;
@@ -824,6 +843,7 @@ int Playing()
 					jump_cnt = 0;
 				}
 			}
+
 			if (playerInfo[playerNum].get_Ypos() == START_POS_Y) {
 				jump_type = 0;
 				jump_cnt = 0;
@@ -838,12 +858,11 @@ int Playing()
 		// 장애물 타입 교체
 		if (huddleInfo[huddle_type].get_Xpos() < 0)
 		{
-			huddle_type = dis1(gen);
+			huddle_type = randomNum(0, 2);
 			huddle_check = TRUE;
 			huddleInfo[huddle_type].set_Xpos(HUDDLE_START_X);
 			if (huddle_type == 2) {
-				bird_height = dis1(gen);
-				switch (bird_height) {
+				switch (randomNum(0, 2)) {
 				case 0:
 					huddleInfo[huddle_type].set_Ypos(BIRD_Y0);
 					break;
@@ -863,14 +882,13 @@ int Playing()
 
 		// 아이템 타입 교체
 		if (((int)difftime(middle, start)) % ITEM_UPDATE == 0) item_once++;
-		if (itemInfo[item_type].get_Xpos() < 0 && (item_once == 1))
-		{
-			item_type = dis2(gen);
+		if (itemInfo[item_type].get_Xpos() < 0 && item_once == 1) {
+			item_type = randomNum(0, 1);
 			start_star = time(NULL);
 			time(&start_star);
 			item_check = TRUE;
 			itemInfo[item_type].set_Xpos(ITEM_START_X);
-			itemInfo[item_type].set_Ypos(dis3(gen));
+			itemInfo[item_type].set_Ypos(randomNum(8, 25));
 		}
 		if (((int)difftime(middle, start)) % (ITEM_UPDATE + 1) == 0) item_once = 0;
 
@@ -884,50 +902,45 @@ int Playing()
 		// 아이템 얻었는지 판정
 		if (check_success(playerNum, item_type) && item_check) {
 			item_check = FALSE;
-			if ((item_type == 0) && (playerInfo[playerNum].get_hp() < 3)) {
+			if ((item_type == 0) && (playerInfo[playerNum].get_hp() < 3))
 				playerInfo[playerNum].set_hp(playerInfo[playerNum].get_hp() + 1);
-			}
-			else if (item_type == 1) {
+			else if (item_type == 1)
 				isStar = TRUE;
-			}
 			item_type = 2;
 		}
+
 		if (((int)difftime(middle, start_star)) > (item_speed - 1) * STAR_MAINTAIN)
 			isStar = FALSE;
 
-		// 현재 점수 출력
+		// 화면 출력
+		// 현재 점수, HP
 		ShowScore((int)difftime(middle, start));
 
-		// 지우기
-		// 현재 체력, 현재 무적인지 아닌지 출력
-		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
-		cursor_pos(0, 1);
-		printf("HEART = %u, STAR = %d", playerInfo[playerNum].get_hp(), isStar);
+		//현재 무적인지 아닌지 --->>> 배경색바꾸기////////////////
+		cursor_pos(2, 2);
+		printf("STAR = %d", isStar);
 
 		// 캐릭터 그리기
 		Character(playerInfo[playerNum]);
 
+		// 아이템 그리기
+		if (itemInfo[item_type].get_Xpos() > 0) {
+			switch (item_type) {
+			case 0:
+				Heart(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos()); break;
+			case 1:
+				Star(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos()); break;
+			}
+		}
+
 		// 장애물 그리기
 		switch (huddle_type) {
 		case 0:
-			Rock(huddleInfo[huddle_type].get_Xpos());
-			break;
+			Rock(huddleInfo[huddle_type].get_Xpos()); break;
 		case 1:
-			Tree(huddleInfo[huddle_type].get_Xpos());
-			break;
+			Tree(huddleInfo[huddle_type].get_Xpos()); break;
 		case 2:
-			Bird(huddleInfo[huddle_type].get_Xpos(), huddleInfo[huddle_type].get_Ypos());
-			break;
-		}
-
-		// 아이템 그리기
-		switch (item_type) {
-		case 0:
-			Heart(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos());
-			break;
-		case 1:
-			Star(itemInfo[item_type].get_Xpos(), itemInfo[item_type].get_Ypos());
-			break;
+			Bird(huddleInfo[huddle_type].get_Xpos(), huddleInfo[huddle_type].get_Ypos()); break;
 		}
 
 		// 구름 그리기
@@ -958,7 +971,7 @@ int main()
 		init_class();
 
 		switch (MainMenu()) {
-		case 0: GameStart(); Count3sec(); gameScore = Playing(); GameOver(); break;
+		case 0: GameStart(); /*Count3sec();*/ gameScore = Playing(); GameOver(); break;
 		case 1: Score(); break;
 		case 2: system("cls"); set_scores_file(); return 0;
 		}
