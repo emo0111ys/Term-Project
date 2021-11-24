@@ -6,6 +6,8 @@
 #include <conio.h>
 #include <time.h>
 #include <random>
+#include <algorithm>
+#include <vector>
 
 // ¹æÇâÅ°
 #define UP					72
@@ -613,11 +615,52 @@ void Count3sec()
 	Sleep(1000);
 }
 
+bool cmp(const int& a, const int& b) {
+	if (a > b) return true;
+	else return false;
+}
+
 int Score()
 {
 	string name[] = { "Player1", "Player2", "Player3" };
-	int ranking[] = { 0, 1, 2 };
+	int ranking[3] = { 0 };
 	int x = 44, y = 10;
+
+	/*
+	vector<uint> vScore;
+	vScore.push_back(playerInfo[ranking[0]].get_score());
+	vScore.push_back(playerInfo[ranking[1]].get_score());
+	vScore.push_back(playerInfo[ranking[2]].get_score());
+
+	sort(vScore.begin(), vScore.end(), cmp);
+	*/
+
+	int score0 = playerInfo[0].get_score();
+	int score1 = playerInfo[1].get_score();
+	int score2 = playerInfo[2].get_score();
+
+	if (score0 > score1) {
+		if (score1 > score2) {
+			ranking[0] = 0; ranking[1] = 1; ranking[2] = 2;
+		}
+		else if (score0 > score2) {
+			ranking[0] = 0; ranking[1] = 2; ranking[2] = 1;
+		}
+		else {
+			ranking[0] = 2; ranking[1] = 0; ranking[2] = 1;
+		}
+	}
+	else {
+		if (score0 > score2) {
+			ranking[0] = 1; ranking[1] = 0; ranking[2] = 2;
+		}
+		else if (score1 > score2) {
+			ranking[0] = 1; ranking[1] = 2; ranking[2] = 0;
+		}
+		else {
+			ranking[0] = 2; ranking[1] = 1; ranking[2] = 0;
+		}
+	}
 
 	system("cls");
 	cursor_pos(x, y);
