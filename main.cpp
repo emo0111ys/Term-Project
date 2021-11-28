@@ -5,10 +5,7 @@
 #include <windows.h>
 #include <conio.h>
 #include <time.h>
-#include <ctime>
 #include <random>
-#include <algorithm>
-#include <vector>
 
 // 방향키
 #define UP					72
@@ -27,7 +24,7 @@
 #define BULLET_START_X		START_POS_X + 18
 
 // Huddle
-#define HUDDLE_TYPE			2
+#define HUDDLE_TYPE			3
 #define HUDDLE_START_X		104
 #define ROCK_START_Y		29
 #define ROCK_SIZE_X			4
@@ -65,6 +62,7 @@
 #define STAR_MAINTAIN		7
 #define BULLET_SPEED		2
 #define WAIT				350
+#define GHOST_SCORE			10
 
 using namespace std;
 typedef unsigned int uint;
@@ -109,8 +107,7 @@ public:
 	void set_hp(uint val) { hp = val; }
 	void set_Xpos(int val) { pos.x = val; }
 	void set_Ypos(int val) { pos.y = val; }
-	friend void Character();
-	friend class Bullet;
+	friend void Character(Player& myplay, bool status);
 	void reset() {
 		hp = MAX_HP;
 		pos.x = START_POS_X;
@@ -528,8 +525,7 @@ int SelectPlayer()
 			Sleep(WAIT);
 			break;
 		}
-		else if (select == 2)
-			break;
+		else if (select == 2) break;
 	}
 
 	return select;
@@ -658,7 +654,7 @@ void Manual()
 	y++;
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
 	cursor_pos(x, y++);
-	printf("Hang in there for as long as possible.");
+	printf("Survive as long as possible.");
 	cursor_pos(x, y++);
 	printf("GOOD LUCK!");
 	cursor_pos(x, y + 2);
@@ -676,27 +672,11 @@ void Manual()
 	}
 }
 
-/*
-bool cmp(const int& a, const int& b) {
-	if (a > b) return true;
-	else return false;
-}
-*/
-
 void Score()
 {
 	string name[] = { "Player1", "Player2", "Player3" };
 	int ranking[3] = { 0, 1, 2 };
 	int x = 44, y = 10;
-
-	/*
-	vector<uint> vScore;
-	vScore.push_back(playerInfo[ranking[0]].get_score());
-	vScore.push_back(playerInfo[ranking[1]].get_score());
-	vScore.push_back(playerInfo[ranking[2]].get_score());
-
-	sort(vScore.begin(), vScore.end(), cmp);
-	*/
 
 	int score0 = playerInfo[0].get_score();
 	int score1 = playerInfo[1].get_score();
@@ -750,9 +730,9 @@ void Score()
 	}
 }
 
-void Character(Player myplay, bool status)
+void Character(Player& myplay, bool status)
 {
-	int x = myplay.get_Xpos(), y = myplay.get_Ypos();
+	int x = myplay.pos.x, y = myplay.pos.y;
 
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), DARK_GRAY);
 	cursor_pos(x + 6, y++);
@@ -1095,14 +1075,15 @@ void timeHP(uint flowtime)
 {
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), WHITE);
 	cursor_pos(2, 1);
-	printf("TIME  %u", flowtime);
+	printf("TIME  %u min %u sec", flowtime / 60, flowtime % 60);
+	// printf("TIME  %u sec", flowtime);
 
 	cursor_pos(102, 1);
 	printf("HEART  ");
 	for (uint i = 0; i < playerInfo[playerNum].get_hp(); i++) printf("♥ ");
 }
 
-int check_attack()
+bool check_attack()
 {
 	int bx = bulletInfo.get_Xpos(), by = bulletInfo.get_Ypos();
 	int mx = monsterInfo.get_Xpos(), my = monsterInfo.get_Ypos();
@@ -1110,16 +1091,16 @@ int check_attack()
 	for (int i = bx; i < bx + 2; i++) {
 		for (int nx = mx; nx < mx + MONSTER_SIZE; nx++) {
 			for (int ny = my; ny < my + MONSTER_SIZE; ny++) {
-				if (i == nx && by == ny) return 1;
+				if (i == nx && by == ny) return TRUE;
 			}
 		}
 	}
-	return 0;
+	return FALSE;
 }
 
-int check_hunt(bool status)
+bool check_hunt(bool status)
 {
-	if (status) return 0;
+	if (status) return FALSE;
 
 	int px = playerInfo[playerNum].get_Xpos(), py = playerInfo[playerNum].get_Ypos();
 	int mx = monsterInfo.get_Xpos(), my = monsterInfo.get_Ypos();
@@ -1128,17 +1109,17 @@ int check_hunt(bool status)
 		for (int j = py; j < py + SIZE_Y; j++) {
 			for (int nx = mx; nx < mx + MONSTER_SIZE; nx++) {
 				for (int ny = my; ny < my + MONSTER_SIZE; ny++) {
-					if (i == nx && j == ny) return 1;
+					if (i == nx && j == ny) return TRUE;
 				}
 			}
 		}
 	}
-	return 0;
+	return FALSE;
 }
 
-int check_fail(uint huddle, bool status)
+bool check_fail(uint huddle, bool status)
 {
-	if (status) return 0;
+	if (status) return FALSE;
 
 	int px = playerInfo[playerNum].get_Xpos(), py = playerInfo[playerNum].get_Ypos();
 	int hx = huddleInfo[huddle].get_Xpos(), hy;
@@ -1150,7 +1131,7 @@ int check_fail(uint huddle, bool status)
 			for (int j = py; j < py + SIZE_Y; j++) {
 				for (int nx = hx; nx < hx + ROCK_SIZE_X; nx++) {
 					for (int ny = hy; ny < hy + ROCK_SIZE_Y; ny++) {
-						if (i == nx && j == ny) return 1;
+						if (i == nx && j == ny) return TRUE;
 					}
 				}
 			}
@@ -1163,7 +1144,7 @@ int check_fail(uint huddle, bool status)
 			for (int j = py; j < py + SIZE_Y; j++) {
 				for (int nx = hx; nx < hx + TREE_SIZE_X; nx++) {
 					for (int ny = hy; ny < hy + TREE_SIZE_Y; ny++) {
-						if (i == nx && j == ny) return 1;
+						if (i == nx && j == ny) return TRUE;
 					}
 				}
 			}
@@ -1177,16 +1158,38 @@ int check_fail(uint huddle, bool status)
 			for (int j = py; j < py + SIZE_Y; j++) {
 				for (int nx = hx; nx < hx + BIRD_SIZE_X; nx++) {
 					for (int ny = hy; ny < hy + BIRD_SIZE_Y; ny++) {
-						if (i == nx && j == ny) return 1;
+						if (i == nx && j == ny) return TRUE;
 					}
 				}
 			}
 		}
 	}
-	return 0;
+	else {
+		// rock & bird
+		hx = huddleInfo[0].get_Xpos();
+		hy = ROCK_START_Y;
+		int bx = huddleInfo[2].get_Xpos(), by = huddleInfo[2].get_Ypos();
+		for (int i = px; i < px + SIZE_X; i++) {
+			for (int j = py; j < py + SIZE_Y; j++) {
+				// rock
+				for (int nx = hx; nx < hx + ROCK_SIZE_X; nx++) {
+					for (int ny = hy; ny < hy + ROCK_SIZE_Y; ny++) {
+						if (i == nx && j == ny) return TRUE;
+					}
+				}
+				// bird
+				for (int nx = bx; nx < bx + BIRD_SIZE_X; nx++) {
+					for (int ny = by; ny < by + BIRD_SIZE_Y; ny++) {
+						if (i == nx && j == ny) return TRUE;
+					}
+				}
+			}
+		}
+	}
+	return FALSE;
 }
 
-int check_success(uint player, uint item)
+bool check_success(uint player, uint item)
 {
 	int px = playerInfo[playerNum].get_Xpos(), py = playerInfo[playerNum].get_Ypos();
 	int ix = itemInfo[item].get_Xpos(), iy = itemInfo[item].get_Ypos();
@@ -1197,7 +1200,7 @@ int check_success(uint player, uint item)
 			for (int j = py; j < py + SIZE_Y; j++) {
 				for (int nx = ix; nx < ix + HEART_SIZE_X; nx++) {
 					for (int ny = iy; ny < iy + HEART_SIZE_Y; ny++) {
-						if (i == nx && j == ny) return 1;
+						if (i == nx && j == ny) return TRUE;
 					}
 				}
 			}
@@ -1209,13 +1212,13 @@ int check_success(uint player, uint item)
 			for (int j = py; j < py + SIZE_Y; j++) {
 				for (int nx = ix; nx < ix + STAR_SIZE; nx++) {
 					for (int ny = iy; ny < iy + STAR_SIZE; ny++) {
-						if (i == nx && j == ny) return 1;
+						if (i == nx && j == ny) return TRUE;
 					}
 				}
 			}
 		}
 	}
-	return 0;
+	return FALSE;
 }
 
 uint Playing()
@@ -1315,37 +1318,51 @@ uint Playing()
 				}
 			}
 		}
-		if (bulletInfo.get_Xpos() > 116)
-			bullet_check = FALSE;
+		if (bulletInfo.get_Xpos() > 116) bullet_check = FALSE;
 		/*--------------------------*/
 
 		/*----------장애물----------*/
 		// 장애물 속도 증가
 		middle = time(NULL);
 		time(&middle);
-		if ((int)difftime(middle, start) > ((huddle_speed - 1) * SPEED_UPDATE)) huddle_speed++;
+		if ((int)difftime(middle, start) > (huddle_speed * SPEED_UPDATE)) huddle_speed++;
 
 		// 장애물 위치 선정
-		uint huddle_curx = huddleInfo[huddle_type].get_Xpos();
-		huddleInfo[huddle_type].set_Xpos(huddle_curx - huddle_speed);
+		if (huddle_type == 3) {
+			uint huddle_curx = huddleInfo[0].get_Xpos();
+			huddleInfo[0].set_Xpos(huddle_curx - huddle_speed);
+			huddleInfo[2].set_Xpos(huddle_curx - huddle_speed);
+		}
+		else {
+			uint huddle_curx = huddleInfo[huddle_type].get_Xpos();
+			huddleInfo[huddle_type].set_Xpos(huddle_curx - huddle_speed);
+		}
 
 		// 장애물 타입 교체
-		if (huddleInfo[huddle_type].get_Xpos() < 0) {
+		if ((huddle_type == 3 && huddleInfo[0].get_Xpos() < 0) || (huddleInfo[huddle_type].get_Xpos() < 0)) {
 			huddle_type = randomNum(0, HUDDLE_TYPE);
 			huddle_check = TRUE;
 
-			huddleInfo[huddle_type].set_Xpos(HUDDLE_START_X);
-			if (huddle_type == 2) {
-				switch (randomNum(0, BIRD_TYPE)) {
-				case 0:
-					huddleInfo[huddle_type].set_Ypos(BIRD_START_Y0);
-					break;
-				case 1:
-					huddleInfo[huddle_type].set_Ypos(BIRD_START_Y1);
-					break;
-				case 2:
-					huddleInfo[huddle_type].set_Ypos(BIRD_START_Y2);
-					break;
+			if (huddle_type == 3) {
+				huddleInfo[0].set_Xpos(HUDDLE_START_X);
+				huddleInfo[2].set_Xpos(HUDDLE_START_X);
+				huddleInfo[2].set_Ypos(BIRD_START_Y0);
+			}
+
+			else {
+				huddleInfo[huddle_type].set_Xpos(HUDDLE_START_X);
+				if (huddle_type == 2) {
+					switch (randomNum(0, BIRD_TYPE)) {
+					case 0:
+						huddleInfo[huddle_type].set_Ypos(BIRD_START_Y0);
+						break;
+					case 1:
+						huddleInfo[huddle_type].set_Ypos(BIRD_START_Y1);
+						break;
+					case 2:
+						huddleInfo[huddle_type].set_Ypos(BIRD_START_Y2);
+						break;
+					}
 				}
 			}
 		}
@@ -1425,17 +1442,11 @@ uint Playing()
 		/*--------------------------*/
 
 		/*---------화면 출력--------*/
+		// 현재 플레이 시간, HP 출력
+		timeHP((int)difftime(middle, start));
+
 		// 플레이어 그리기
 		Character(playerInfo[playerNum], isStar);
-
-		// 총알 그리기
-		if (bullet_check) Dot(bulletInfo.get_Xpos());
-
-		// 몬스터 그리기
-		if ((int)difftime(middle, start) > MONSTER_UPDATE) {
-			if (!monsterInfo.get_dead() && monsterInfo.get_Xpos() > 0)
-				Ghost(monsterInfo.get_Xpos(), monsterInfo.get_Ypos());
-		}
 
 		// 아이템 그리기
 		if ((int)difftime(middle, start) > ITEM_UPDATE) {
@@ -1449,8 +1460,14 @@ uint Playing()
 			}
 		}
 
-		// 현재 플레이 시간, HP 출력
-		timeHP((int)difftime(middle, start));
+		// 총알 그리기
+		if (bullet_check) Dot(bulletInfo.get_Xpos());
+
+		// 몬스터 그리기
+		if ((int)difftime(middle, start) > MONSTER_UPDATE) {
+			if (!monsterInfo.get_dead() && monsterInfo.get_Xpos() > 0)
+				Ghost(monsterInfo.get_Xpos(), monsterInfo.get_Ypos());
+		}
 
 		// 장애물 그리기
 		switch (huddle_type) {
@@ -1460,6 +1477,8 @@ uint Playing()
 			Tree(huddleInfo[huddle_type].get_Xpos()); break;
 		case 2:
 			Bird(huddleInfo[huddle_type].get_Xpos(), huddleInfo[huddle_type].get_Ypos()); break;
+		case 3:
+			Rock(huddleInfo[0].get_Xpos()); Bird(huddleInfo[2].get_Xpos(), huddleInfo[2].get_Ypos()); break;
 		}
 
 		// 화면 clear
@@ -1470,7 +1489,7 @@ uint Playing()
 	// 점수 설정
 	finish = time(NULL);
 	time(&finish);
-	uint total_score = (int)difftime(finish, start) + num_ghost * 10;
+	uint total_score = (int)difftime(finish, start) + num_ghost * GHOST_SCORE;
 	uint prev = playerInfo[playerNum].get_score();
 
 	playerInfo[playerNum].set_score(total_score > prev ? total_score : prev);
@@ -1480,7 +1499,7 @@ uint Playing()
 
 int main()
 {
-	system("mode con:cols=120 lines=35");	// 화면 가로, 세로
+	system("mode con:cols=120 lines=35");	// 콘솔 창 가로, 세로
 
 	get_score_file();
 
@@ -1490,14 +1509,16 @@ int main()
 
 		switch (MainMenu()) {
 		case 0: {
-			if (SelectPlayer() == 2)			// 첫 화면으로 이동
-				break;
-			else {
+			int select = SelectPlayer();
+
+			if (select == 1) {
 				Count3sec();				// 게임 시작 전 3초 count
 				uint score = Playing();
 				GameOver(score);
+				set_score_file();			// output 파일 업데이트
 				break;						// 첫 화면으로 이동
 			}
+			else if (select == 2) break;	// 첫 화면으로 이동
 		}
 		case 1: {
 			Manual();
