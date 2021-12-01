@@ -1,7 +1,6 @@
 #include <iostream>
-#include <fstream>
 #include <stdio.h>
-#include <string>
+#include <fstream>
 #include <windows.h>
 #include <conio.h>
 #include <time.h>
@@ -41,7 +40,6 @@
 
 // Monster
 #define MONSTER_START_X		95
-#define MONSTER_START_Y		3
 #define MONSTER_BOUND_UP	3
 #define MONSTER_BOUND_DOWN	18
 #define MONSTER_SIZE		12
@@ -61,8 +59,9 @@
 #define MONSTER_UPDATE		30
 #define STAR_MAINTAIN		7
 #define BULLET_SPEED		2
-#define WAIT				350
+#define WAIT				300
 #define GHOST_SCORE			10
+#define JUMP_SIZE			8
 
 using namespace std;
 typedef unsigned int uint;
@@ -92,82 +91,63 @@ typedef struct _position {
 	int y;
 }P;
 
-class Player {
+class Basis {
+protected:
+	P pos;
+public:
+	int get_Xpos() { return pos.x; }
+	int get_Ypos() { return pos.y; }
+	void set_Xpos(int val) { pos.x = val; }
+	void set_Ypos(int val) { pos.y = val; }
+	void reset(int X, int Y) { pos.x = X; pos.y = Y; }
+};
+
+class Player : public Basis {
 private:
 	uint score;
 	uint hp;
-	P pos;
 public:
-	Player() : score(0), hp(MAX_HP) { pos.x = START_POS_X; pos.y = START_POS_Y; }
+	Player() : score(0), hp(MAX_HP) { Basis::reset(START_POS_X, START_POS_Y); }
 	uint get_score() { return score; }
 	uint get_hp() { return hp; }
-	int get_Xpos() { return pos.x; }
-	int get_Ypos() { return pos.y; }
-	void set_score(uint s) { score = s; }
+	void set_score(uint val) { score = val; }
 	void set_hp(uint val) { hp = val; }
-	void set_Xpos(int val) { pos.x = val; }
-	void set_Ypos(int val) { pos.y = val; }
 	friend void Character(Player& myplay, bool status);
 	void reset() {
+		Basis::reset(START_POS_X, START_POS_Y);
 		hp = MAX_HP;
-		pos.x = START_POS_X;
-		pos.y = START_POS_Y;
 	}
 };
 
-class Bullet {
-private:
-	P pos;
+class Bullet : public Basis {
 public:
-	Bullet() { pos.x = BULLET_START_X; pos.y = 0; }
-	int get_Xpos() { return pos.x; }
-	int get_Ypos() { return pos.y; }
-	void set_Xpos(int val) { pos.x = val; }
-	void set_Ypos(int val) { pos.y = val; }
-	void reset() { pos.x = BULLET_START_X; pos.y = 0; }
+	Bullet() { Basis::reset(BULLET_START_X, 0); }
+	void reset() { Basis::reset(BULLET_START_X, 0); }
 };
 
-class Huddle {
-private:
-	P pos;
+class Huddle : public Basis {
 public:
-	Huddle() { pos.x = HUDDLE_START_X; pos.y = 0; }
-	int get_Xpos() { return pos.x; }
-	int get_Ypos() { return pos.y; }
-	void set_Xpos(int val) { pos.x = val; }
-	void set_Ypos(int val) { pos.y = val; }
-	void reset() { pos.x = HUDDLE_START_X; pos.y = 0; }
+	Huddle() { Basis::reset(HUDDLE_START_X, 0); }
+	void reset() { Basis::reset(HUDDLE_START_X, 0); }
 };
 
-class Monster {
+class Monster : public Basis {
 private:
 	bool isDead;
-	P pos;
 public:
-	Monster() : isDead(FALSE) { pos.x = MONSTER_START_X; pos.y = MONSTER_START_Y; }
+	Monster() : isDead(FALSE) { Basis::reset(MONSTER_START_X, MONSTER_BOUND_UP); }
 	bool get_dead() { return isDead; }
-	int get_Xpos() { return pos.x; }
-	int get_Ypos() { return pos.y; }
 	void set_dead(bool val) { isDead = val; }
-	void set_Xpos(int val) { pos.x = val; }
-	void set_Ypos(int val) { pos.y = val; }
 	void reset() {
+		Basis::reset(MONSTER_START_X, MONSTER_BOUND_UP);
 		isDead = FALSE;
-		pos.x = MONSTER_START_X;
-		pos.y = MONSTER_START_Y;
 	}
 };
 
-class Item {
-private:
-	P pos;
+class Item : public Basis {
 public:
-	Item() { pos.x = ITEM_START_X; pos.y = ITEM_BOUND_UP; }
-	int get_Xpos() { return pos.x; }
-	int get_Ypos() { return pos.y; }
-	void set_Xpos(int val) { pos.x = val; }
-	void set_Ypos(int val) { pos.y = val; }
-	void reset() { pos.x = ITEM_START_X; pos.y = ITEM_BOUND_UP; }
+	Item() { Basis::reset(ITEM_START_X, ITEM_BOUND_UP); }
+	void reset() { Basis::reset(ITEM_START_X, ITEM_BOUND_UP); }
 };
 
 /*---------전역 변수 초기화---------*/
@@ -226,7 +206,7 @@ inline T randomNum(T min, T max)
 	return dist(gen);
 }
 
-void cursor_pos(int x, int y)
+inline void cursor_pos(int x, int y)
 {
 	COORD p;
 	p.X = x;
@@ -625,7 +605,7 @@ void Manual()
 	printf("=============== H O W  T O  P L A Y ===============");
 	y++;
 	cursor_pos(x + 12, y++);
-	printf("↑ : JUMP    → : ATTACK"); // ← ↓
+	printf("↑ : JUMP    → : ATTACK");
 	y++; y++;
 	cursor_pos(x, y++);
 	printf("Avoid various obstacles that are approaching!");
@@ -659,16 +639,11 @@ void Manual()
 	printf("GOOD LUCK!");
 	cursor_pos(x, y + 2);
 	printf("===================================================");
-
-	bool isSelect = FALSE;
+	printf("\n\n\n\n\n");
 
 	while (1) {
-		int key = input_key_dir();
-
-		if (key == LEFT) isSelect = TRUE;
-		else if (key == 0) continue;
-
-		if (isSelect) break;
+		if (input_key_dir() == LEFT)
+			break;
 	}
 }
 
@@ -718,15 +693,9 @@ void Score()
 	printf("=================================");
 	printf("\n\n\n\n\n\n\n\n\n\n\n");
 
-	bool isSelect = FALSE;
-
 	while (1) {
-		int key = input_key_dir();
-
-		if (key == LEFT) isSelect = TRUE;
-		else if (key == 0) continue;
-
-		if (isSelect) break;
+		if (input_key_dir() == LEFT)
+			break;
 	}
 }
 
@@ -1189,7 +1158,7 @@ bool check_fail(uint huddle, bool status)
 	return FALSE;
 }
 
-bool check_success(uint player, uint item)
+bool check_success(uint item)
 {
 	int px = playerInfo[playerNum].get_Xpos(), py = playerInfo[playerNum].get_Ypos();
 	int ix = itemInfo[item].get_Xpos(), iy = itemInfo[item].get_Ypos();
@@ -1238,7 +1207,7 @@ uint Playing()
 
 	// 점프 관련 변수
 	bool isDown = FALSE;
-	int jump_size = 8, jump_cnt = 0, jump_type = 0;
+	int jump_cnt = 0, jump_type = 0;
 
 	// 총알 관련 변수
 	bool bullet_check = FALSE;
@@ -1266,20 +1235,20 @@ uint Playing()
 			if (jump_type == 0)
 				jump_type = 1;
 			else if (jump_type == 1) {
-				isDown = FALSE;
 				jump_type = 2;
 				jump_cnt = 0;
+				isDown = FALSE;
 			}
 		}
 
 		// 플레이어 위치 선정
 		if (jump_type) {
-			jump_cnt++;
-
 			if (isDown) playerInfo[playerNum].set_Ypos(playerInfo[playerNum].get_Ypos() + 1);
 			else		playerInfo[playerNum].set_Ypos(playerInfo[playerNum].get_Ypos() - 1);
 
-			if (jump_cnt == jump_size) {
+			jump_cnt++;
+
+			if (jump_cnt == JUMP_SIZE) {
 				if (!isDown) {
 					isDown = TRUE;
 					jump_cnt = 0;
@@ -1427,7 +1396,7 @@ uint Playing()
 		}
 
 		// 아이템 얻었는지 판정
-		if (check_success(playerNum, item_type) && item_check) {
+		if (check_success(item_type) && item_check) {
 			item_check = FALSE;
 
 			if ((item_type == 0) && (playerInfo[playerNum].get_hp() < MAX_HP))
